@@ -85,20 +85,32 @@ def init():
 init()
 
 def set_case(k):
-    st.session_state.case = CASES[k].copy()
+    case = CASES[k].copy()
+    st.session_state.case = case
+
+    # Atualiza também o estado dos widgets já renderizados.
+    # Sem isso, o Streamlit preserva os valores antigos dos campos e
+    # o botão "Carregar Caso" parece não fazer nada.
+    for field, value in case.items():
+        st.session_state[f"w_{field}"] = value
+
     st.session_state.result = None
     st.session_state.meeting_guide = None
 
 def select_value(label, options, key):
-    value = st.session_state.case.get(key, "")
-    idx = options.index(value) if value in options else 0
-    return st.selectbox(label, options, index=idx, key=f"w_{key}")
+    widget_key = f"w_{key}"
+    if widget_key not in st.session_state:
+        value = st.session_state.case.get(key, "")
+        st.session_state[widget_key] = value if value in options else options[0]
+    return st.selectbox(label, options, key=widget_key)
 
 def text_value(label, key, height=None, placeholder=None):
-    value = st.session_state.case.get(key, "")
+    widget_key = f"w_{key}"
+    if widget_key not in st.session_state:
+        st.session_state[widget_key] = st.session_state.case.get(key, "")
     if height:
-        return st.text_area(label, value=value, height=height, placeholder=placeholder, key=f"w_{key}")
-    return st.text_input(label, value=value, placeholder=placeholder, key=f"w_{key}")
+        return st.text_area(label, height=height, placeholder=placeholder, key=widget_key)
+    return st.text_input(label, placeholder=placeholder, key=widget_key)
 
 def empty(v):
     return not str(v or "").strip()
@@ -337,6 +349,10 @@ with st.sidebar:
 
     if st.button("Limpar", use_container_width=True):
         st.session_state.case = {}
+        # Limpa os campos visíveis do formulário.
+        for key in list(st.session_state.keys()):
+            if key.startswith("w_"):
+                del st.session_state[key]
         st.session_state.result = None
         st.session_state.meeting_guide = None
         st.rerun()
